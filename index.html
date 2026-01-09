@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Doctor Appointments</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .hidden { display:none }
+    .card { border:1px solid #ddd; padding:12px; margin:8px 0 }
+    label { display:block; margin-top:8px }
+  </style>
+</head>
+<body>
+  <h1>Doctor Appointment Booking</h1>
+
+  <div id="signin">
+    <h2>Sign In</h2>
+    <label>Username <input id="username" value="test@example.com" /></label>
+    <label>Password <input id="password" type="password" value="password" /></label>
+    <button id="signinBtn">Sign In</button>
+    <p id="signinMsg"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <button id="signoutBtn">Sign Out</button>
+    <h2>Book an Appointment</h2>
+    <div id="doctors"></div>
+
+    <h3>Appointment Details</h3>
+    <label>Type
+      <select id="typeSelect">
+        <option>General Consultation</option>
+        <option>Follow Up</option>
+        <option>Emergency Visit</option>
+      </select>
+    </label>
+    <label>Date <input type="date" id="dateInput" /></label>
+    <label>Time Slot
+      <select id="timeSelect">
+        <option>09:00</option>
+        <option>10:00</option>
+        <option>11:00</option>
+        <option>14:00</option>
+        <option>15:00</option>
+      </select>
+    </label>
+    <button id="bookBtn">Book</button>
+
+    <h3>Your Appointments</h3>
+    <div id="appointments"></div>
+  </div>
+
+  <script>
+    let token = null;
+    const api = (path, opts={}) => fetch('/api' + path, Object.assign({ headers: { 'Content-Type': 'application/json', 'Authorization': token ? ('Bearer ' + token) : '' } }, opts)).then(r=>r.json());
+
+    document.getElementById('signinBtn').onclick = async () => {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const res = await api('/signin', { method: 'POST', body: JSON.stringify({ username, password }) });
+      if (res.token) {
+        token = res.token;
+        document.getElementById('signin').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        loadDoctors();
+        loadAppointments();
+      } else {
+        document.getElementById('signinMsg').innerText = res.error || 'Sign-in failed';
+      }
+    };
+
+    document.getElementById('signoutBtn').onclick = () => {
+      token = null;
+      document.getElementById('signin').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+    };
+
+    async function loadDoctors() {
+      const docs = await api('/doctors');
+      const container = document.getElementById('doctors');
+      container.innerHTML = '';
+      docs.forEach(d => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `<strong>${d.name}</strong> <em>${d.specialty}</em><div>${d.info}</div><div><label><input type=radio name=doctor value='${d.id}' /> Select</label></div>`;
+        container.appendChild(el);
+      });
+    }
+
+    async function loadAppointments() {
+      const appts = await api('/appointments');
+      const container = document.getElementById('appointments');
+      container.innerHTML = '';
+      appts.forEach(a => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `<div><strong>${a.doctorName} (${a.specialty})</strong></div><div>Type: ${a.type}</div><div>Date: ${a.date} ${a.timeSlot}</div>`;
+        container.appendChild(el);
+      });
+    }
+
+    document.getElementById('bookBtn').onclick = async () => {
+      const selected = document.querySelector('input[name=doctor]:checked');
+      if (!selected) { alert('Select a doctor'); return; }
+      const doctorId = selected.value;
+      const type = document.getElementById('typeSelect').value;
+      const date = document.getElementById('dateInput').value;
+      const timeSlot = document.getElementById('timeSelect').value;
+      const res = await api('/book', { method: 'POST', body: JSON.stringify({ doctorId, type, date, timeSlot }) });
+      if (res.error) { alert('Error: ' + res.error); } else { alert('Booked'); loadAppointments(); }
+    };
+  </script>
+</body>
+</html>
